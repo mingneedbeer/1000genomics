@@ -1,0 +1,163 @@
+---
+import Layout from "../layouts/Layout.astro";
+import evalData from "../data/model_evaluation.json";
+
+const overall = evalData.filter((e: any) => e.ancestry === "ALL");
+const byAncestry = evalData.filter((e: any) => e.ancestry !== "ALL");
+
+const popColors: Record<string, string> = {
+  AFR: "#E63946", AMR: "#457B9D", EUR: "#2A9D8F", SAS: "#E9C46A", EAS: "#F4A261",
+};
+
+const diseases = [...new Set(byAncestry.map((e: any) => e.disease))];
+const ancestryGroups = [...new Set(byAncestry.map((e: any) => e.ancestry))].sort();
+---
+
+<Layout title="Evaluation" activePage="evaluation">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold mb-2">Model Evaluation</h1>
+    <p class="text-[var(--text-secondary)]">
+      AUC-ROC, Brier score, and calibration metrics across diseases and ancestry groups.
+    </p>
+  </div>
+
+  <!-- Overall Metrics -->
+  <div class="card mb-8">
+    <h2 class="text-lg font-semibold mb-4">Overall Model Performance</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {overall.map((d: any) => {
+        const name = d.disease.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+        const aucPct = (d.auc_roc * 100).toFixed(1);
+        const color = d.auc_roc > 0.6 ? "var(--accent-green)" : d.auc_roc > 0.55 ? "var(--accent-amber)" : "var(--accent-red)";
+        return (
+          <div class="bg-[var(--bg-secondary)] rounded-lg p-5 border border-[var(--border)]">
+            <div class="text-sm text-[var(--text-secondary)] mb-2">{name}</div>
+            <div class="flex items-end gap-2 mb-3">
+              <span class="text-3xl font-bold" style={`color: ${color}`}>{aucPct}%</span>
+            </div>
+            <div class="auc-bar mb-3">
+              <div class="auc-fill" style={`width: ${aucPct}%; background: ${color}`}></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <div class="text-[var(--text-secondary)]">Brier</div>
+                <div class="font-semibold">{d.brier_score.toFixed(4)}</div>
+              </div>
+              <div>
+                <div class="text-[var(--text-secondary)]">Cases</div>
+                <div class="font-semibold">{d.n_cases} / {d.n_samples}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+
+  <!-- Ancestry Breakdown Heatmap -->
+  <div class="card mb-8">
+    <h2 class="text-lg font-semibold mb-4">AUC-ROC by Disease and Ancestry</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr>
+            <th class="text-left">Disease</th>
+            {ancestryGroups.map((a) => (
+              <th class="text-center">
+                <span class="pop-dot" style={`background: ${popColors[a] || "#888"}`}></span>
+                {a}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {diseases.map((disease) => {
+            const name = disease.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+            const diseaseData = byAncestry.filter((e: any) => e.disease === disease);
+            return (
+              <tr>
+                <td class="font-medium">{name}</td>
+                {ancestryGroups.map((a) => {
+                  const row = diseaseData.find((e: any) => e.ancestry === a);
+                  if (!row) return <td class="text-center text-[var(--text-secondary)]">-</td>;
+                  const auc = row.auc_roc;
+                  const bg = auc > 0.7 ? "rgba(16,185,129,0.15)" :
+                             auc > 0.6 ? "rgba(245,158,11,0.1)" :
+                             auc > 0.55 ? "rgba(59,130,246,0.1)" : "transparent";
+                  const color = auc > 0.7 ? "#10b981" : auc > 0.6 ? "#f59e0b" : auc > 0.55 ? "#3b82f6" : "var(--text-secondary)";
+                  return (
+                    <td class="text-center font-semibold text-sm" style={`background: ${bg}; color: ${color}`}>
+                      {(auc * 100).toFixed(1)}%
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Full Evaluation Table -->
+  <div class="card mb-8">
+    <h2 class="text-lg font-semibold mb-4">Detailed Metrics</h2>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Disease</th>
+            <th>Ancestry</th>
+            <th>AUC-ROC</th>
+            <th>Brier Score</th>
+            <th>Avg Precision</th>
+            <th>Log Loss</th>
+            <th>N</th>
+            <th>Cases</th>
+          </tr>
+        </thead>
+        <tbody>
+          {evalData
+            .sort((a: any, b: any) => {
+              if (a.ancestry === "ALL" && b.ancestry !== "ALL") return -1;
+              if (a.ancestry !== "ALL" && b.ancestry === "ALL") return 1;
+              return b.auc_roc - a.auc_roc;
+            })
+            .map((row: any) => {
+              const name = row.disease.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+              const isAll = row.ancestry === "ALL";
+              return (
+                <tr class={isAll ? "bg-[var(--bg-secondary)]" : ""}>
+                  <td class={`font-medium ${isAll ? "font-bold" : ""}`}>{name}</td>
+                  <td>
+                    {isAll ? (
+                      <span class="font-semibold">ALL</span>
+                    ) : (
+                      <>
+                        <span class="pop-dot" style={`background: ${popColors[row.ancestry] || "#888"}`}></span>
+                        {row.ancestry}
+                      </>
+                    )}
+                  </td>
+                  <td class="font-semibold" style={`color: ${row.auc_roc > 0.65 ? "var(--accent-green)" : row.auc_roc > 0.55 ? "var(--accent-amber)" : "var(--text-secondary)"}`}>
+                    {(row.auc_roc * 100).toFixed(1)}%
+                  </td>
+                  <td class="text-[var(--text-secondary)]">{row.brier_score.toFixed(4)}</td>
+                  <td class="text-[var(--text-secondary)]">{row.avg_precision.toFixed(4)}</td>
+                  <td class="text-[var(--text-secondary)]">{row.log_loss.toFixed(4)}</td>
+                  <td class="text-[var(--text-secondary)]">{row.n_samples}</td>
+                  <td class="text-[var(--text-secondary)]">{row.n_cases}</td>
+                </tr>
+              );
+            })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Ancestry AUC Plot -->
+  <div class="card">
+    <h2 class="text-lg font-semibold mb-4">AUC-ROC by Ancestry Group</h2>
+    <img src="/ancestry_auc.png" alt="Ancestry AUC" class="w-full rounded-lg" />
+  </div>
+</Layout>

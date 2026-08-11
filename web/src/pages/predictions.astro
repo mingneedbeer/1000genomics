@@ -1,0 +1,121 @@
+---
+import Layout from "../layouts/Layout.astro";
+import reports from "../data/risk_reports_sample.json";
+import prsSummary from "../data/prs_summary.json";
+
+const popColors: Record<string, string> = {
+  AFR: "#E63946", AMR: "#457B9D", EUR: "#2A9D8F", SAS: "#E9C46A", EAS: "#F4A261",
+};
+
+const diseases = ["cardiovascular", "cancer", "type2_diabetes", "autoimmune"];
+const diseaseLabels: Record<string, string> = {
+  cardiovascular: "Cardiovascular",
+  cancer: "Cancer",
+  type2_diabetes: "Type 2 Diabetes",
+  autoimmune: "Autoimmune",
+};
+
+function getLevelColor(level: string): string {
+  switch (level) {
+    case "HIGH": return "#ef4444";
+    case "MODERATE": return "#f59e0b";
+    case "LOW": return "#3b82f6";
+    default: return "#10b981";
+  }
+}
+---
+
+<Layout title="Risk Predictions" activePage="predictions">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold mb-2">Risk Predictions</h1>
+    <p class="text-[var(--text-secondary)]">
+      Per-individual disease risk scores for 2,504 1000 Genomes participants (showing top 100).
+    </p>
+  </div>
+
+  <!-- PRS Summary -->
+  <div class="card mb-8">
+    <h2 class="text-lg font-semibold mb-4">PRS Summary by Disease</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {prsSummary.map((p: any) => {
+        const name = p.disease.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+        return (
+          <div class="bg-[var(--bg-secondary)] rounded-lg p-4 border border-[var(--border)]">
+            <div class="text-sm text-[var(--text-secondary)] mb-1">{name}</div>
+            <div class="text-xl font-bold mb-1">{p.mean_prs.toFixed(2)}</div>
+            <div class="text-xs text-[var(--text-secondary)]">
+              SD: {p.std_prs.toFixed(2)} &middot; {p.n_snps} SNPs
+            </div>
+            <div class="text-xs text-[var(--text-secondary)] mt-1">
+              Range: [{p.min_prs.toFixed(2)}, {p.max_prs.toFixed(2)}]
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+
+  <!-- Risk Table -->
+  <div class="card mb-8">
+    <h2 class="text-lg font-semibold mb-4">Individual Risk Reports</h2>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Sample</th>
+            <th>Population</th>
+            {diseases.map((d) => (
+              <th>{diseaseLabels[d]}</th>
+            ))}
+            <th>Max Risk</th>
+            <th>Top Disease</th>
+          </tr>
+        </thead>
+        <tbody>
+          {reports.slice(0, 50).map((r: any) => {
+            let parsed: any;
+            try { parsed = JSON.parse(r.risk_report); } catch { parsed = {}; }
+            return (
+              <tr>
+                <td class="font-mono text-sm font-medium">{r.sample_id}</td>
+                <td>
+                  <span class="pop-dot" style={`background: ${popColors[r.population] || "#888"}`}></span>
+                  {r.population}
+                </td>
+                {diseases.map((d) => {
+                  const risk = parsed[d];
+                  if (!risk) return <td class="text-[var(--text-secondary)]">-</td>;
+                  const color = getLevelColor(risk.level);
+                  return (
+                    <td>
+                      <div class="flex items-center gap-2">
+                        <span class="font-semibold" style={`color: ${color}`}>
+                          {(risk.probability * 100).toFixed(1)}%
+                        </span>
+                        <span class={`level-badge level-${risk.level}`}>{risk.level}</span>
+                      </div>
+                    </td>
+                  );
+                })}
+                <td class="font-semibold" style={`color: ${getLevelColor(
+                  (() => { try { const p = JSON.parse(r.risk_report); const top = Object.values(p).reduce((a: any, b: any) => (a.probability > b.probability ? a : b)); return top.level; } catch { return "VERY_LOW"; } })()
+                )}`}>
+                  {(r.max_risk_probability * 100).toFixed(1)}%
+                </td>
+                <td class="text-[var(--text-secondary)] text-sm">
+                  {r.max_risk_disease.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Distribution Plot -->
+  <div class="card">
+    <h2 class="text-lg font-semibold mb-4">Risk Distribution by Population</h2>
+    <img src="/risk_distributions.png" alt="Risk distributions" class="w-full rounded-lg" />
+  </div>
+</Layout>

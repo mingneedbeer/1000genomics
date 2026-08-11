@@ -1,0 +1,148 @@
+---
+import Layout from "../layouts/Layout.astro";
+import training from "../data/training_summary.json";
+import evalData from "../data/model_evaluation.json";
+import prsSummary from "../data/prs_summary.json";
+import variants from "../data/target_variants.json";
+
+const overall = evalData.filter((e: any) => e.ancestry === "ALL");
+
+const popColors: Record<string, string> = {
+  AFR: "#E63946", AMR: "#457B9D", EUR: "#2A9D8F", SAS: "#E9C46A", EAS: "#F4A261",
+};
+
+const superPopMap: Record<string, string> = {
+  AFR: "African", AMR: "Ad-Mixed American", EUR: "European", SAS: "South Asian", EAS: "East Asian",
+};
+---
+
+<Layout title="Dashboard" activePage="overview">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold mb-2">1000 Genomes Disease Risk Analysis</h1>
+    <p class="text-[var(--text-secondary)]">
+      Polygenic risk scores for {variants.length} disease-associated variants across 2,504 individuals from 5 super-populations.
+    </p>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="card">
+      <div class="text-sm text-[var(--text-secondary)] mb-1">Samples</div>
+      <div class="stat-value text-[var(--accent-blue)]">2,504</div>
+    </div>
+    <div class="card">
+      <div class="text-sm text-[var(--text-secondary)] mb-1">Variants</div>
+      <div class="stat-value text-[var(--accent-purple)]">{variants.length}</div>
+    </div>
+    <div class="card">
+      <div class="text-sm text-[var(--text-secondary)] mb-1">Diseases</div>
+      <div class="stat-value text-[var(--accent-green)]">{overall.length}</div>
+    </div>
+    <div class="card">
+      <div class="text-sm text-[var(--text-secondary)] mb-1">Populations</div>
+      <div class="stat-value text-[var(--accent-amber)]">5</div>
+    </div>
+  </div>
+
+  <!-- Model Performance -->
+  <div class="card mb-8">
+    <h2 class="text-lg font-semibold mb-4">Model Performance Overview</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {overall.map((d: any) => {
+        const diseaseName = d.disease.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+        const aucPct = (d.auc_roc * 100).toFixed(1);
+        const color = d.auc_roc > 0.6 ? "var(--accent-green)" : d.auc_roc > 0.55 ? "var(--accent-amber)" : "var(--accent-red)";
+        return (
+          <div class="bg-[var(--bg-secondary)] rounded-lg p-4 border border-[var(--border)]">
+            <div class="text-sm text-[var(--text-secondary)] mb-2">{diseaseName}</div>
+            <div class="flex items-end gap-2 mb-3">
+              <span class="text-2xl font-bold" style={`color: ${color}`}>{aucPct}%</span>
+              <span class="text-xs text-[var(--text-secondary)] mb-1">AUC-ROC</span>
+            </div>
+            <div class="auc-bar">
+              <div class="auc-fill" style={`width: ${aucPct}%; background: ${color}`}></div>
+            </div>
+            <div class="mt-2 text-xs text-[var(--text-secondary)]">
+              {d.n_cases} cases / {d.n_samples} total
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+
+  <!-- PRS Summary + Plots -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="card">
+      <h2 class="text-lg font-semibold mb-4">PRS Distribution by Disease</h2>
+      <img src="/risk_distributions.png" alt="Risk distributions" class="w-full rounded-lg" />
+    </div>
+    <div class="card">
+      <h2 class="text-lg font-semibold mb-4">Calibration Curves</h2>
+      <img src="/calibration_curves.png" alt="Calibration curves" class="w-full rounded-lg" />
+    </div>
+  </div>
+
+  <!-- Top Ancestry Results -->
+  <div class="card mb-8">
+    <h2 class="text-lg font-semibold mb-4">Top Performing Ancestry Groups</h2>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Disease</th>
+            <th>Population</th>
+            <th>AUC-ROC</th>
+            <th>Samples</th>
+            <th>Brier Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {evalData
+            .filter((e: any) => e.ancestry !== "ALL")
+            .sort((a: any, b: any) => b.auc_roc - a.auc_roc)
+            .slice(0, 10)
+            .map((row: any) => {
+              const diseaseName = row.disease.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+              const color = row.auc_roc > 0.7 ? "var(--accent-green)" : row.auc_roc > 0.6 ? "var(--accent-amber)" : "var(--text-primary)";
+              return (
+                <tr>
+                  <td class="font-medium">{diseaseName}</td>
+                  <td>
+                    <span class="pop-dot" style={`background: ${popColors[row.ancestry] || "#888"}`}></span>
+                    {row.ancestry}
+                  </td>
+                  <td style={`color: ${color}`} class="font-semibold">{(row.auc_roc * 100).toFixed(1)}%</td>
+                  <td class="text-[var(--text-secondary)]">{row.n_samples}</td>
+                  <td class="text-[var(--text-secondary)]">{row.brier_score.toFixed(4)}</td>
+                </tr>
+              );
+            })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pipeline Info -->
+  <div class="card">
+    <h2 class="text-lg font-semibold mb-4">Pipeline Architecture</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {[
+        { step: "1", title: "BigQuery", desc: "Extract variants from 1000 Genomes Phase 3", color: "var(--accent-blue)" },
+        { step: "2", title: "PRS Calculation", desc: "GWAS weights + PCA stratification", color: "var(--accent-purple)" },
+        { step: "3", title: "Vertex AI", desc: "ElasticNet CV model training", color: "var(--accent-green)" },
+        { step: "4", title: "Prediction", desc: "Risk scoring + ancestry evaluation", color: "var(--accent-amber)" },
+      ].map((s) => (
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={`background: ${s.color}`}>
+            {s.step}
+          </div>
+          <div>
+            <div class="font-medium text-sm">{s.title}</div>
+            <div class="text-xs text-[var(--text-secondary)]">{s.desc}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</Layout>

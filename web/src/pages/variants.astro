@@ -1,0 +1,136 @@
+---
+import Layout from "../layouts/Layout.astro";
+import variants from "../data/target_variants.json";
+
+const diseaseMap: Record<string, { disease: string; gene: string }> = {
+  rs429358: { disease: "Cardiovascular", gene: "APOE" },
+  rs10455872: { disease: "Cardiovascular", gene: "LPA" },
+  rs10757278: { disease: "Cardiovascular", gene: "CDKN2A" },
+  rs688: { disease: "Cardiovascular", gene: "LDLR" },
+  rs7903146: { disease: "Type 2 Diabetes", gene: "TCF7L2" },
+  rs1801282: { disease: "Type 2 Diabetes", gene: "PPARG" },
+  rs5219: { disease: "Type 2 Diabetes", gene: "KCNJ11" },
+  rs9939609: { disease: "Type 2 Diabetes", gene: "FTO" },
+  rs17782313: { disease: "Type 2 Diabetes", gene: "MC4R" },
+  rs6457617: { disease: "Autoimmune", gene: "HLA-DRB1" },
+  rs11209026: { disease: "Autoimmune", gene: "IL23R" },
+  rs3087243: { disease: "Autoimmune", gene: "CTLA4" },
+};
+
+const diseaseColors: Record<string, string> = {
+  Cardiovascular: "#ef4444",
+  "Type 2 Diabetes": "#f59e0b",
+  Autoimmune: "#8b5cf6",
+};
+
+const populations = ["afr_af", "amr_af", "eur_af", "sas_af", "eas_af"];
+const popLabels: Record<string, string> = {
+  afr_af: "AFR", amr_af: "AMR", eur_af: "EUR", sas_af: "SAS", eas_af: "EAS",
+};
+const popColors: Record<string, string> = {
+  afr_af: "#E63946", amr_af: "#457B9D", eur_af: "#2A9D8F", sas_af: "#E9C46A", eas_af: "#F4A261",
+};
+---
+
+<Layout title="Variants" activePage="variants">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold mb-2">Disease-Associated Variants</h1>
+    <p class="text-[var(--text-secondary)]">
+      {variants.length} curated variants across 4 disease categories from 1000 Genomes Phase 3.
+    </p>
+  </div>
+
+  <!-- Variant Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+    {variants.map((v: any) => {
+      const info = diseaseMap[v.rsid] || { disease: "Unknown", gene: "?" };
+      const color = diseaseColors[info.disease] || "#888";
+      return (
+        <div class="card hover:border-[var(--accent-blue)] transition-colors">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="text-xs font-medium px-2 py-0.5 rounded-full" style={`background: ${color}20; color: ${color}`}>
+                {info.disease}
+              </span>
+            </div>
+            <span class="text-xs text-[var(--text-secondary)]">chr{v.chrom}:{v.pos.toLocaleString()}</span>
+          </div>
+          <div class="mb-3">
+            <span class="text-xl font-bold">{info.gene}</span>
+            <span class="text-sm text-[var(--text-secondary)] ml-2">{v.rsid}</span>
+          </div>
+          <div class="text-xs text-[var(--text-secondary)] mb-3">
+            {v.ref} &rarr; {v.alt} &middot; Global AF: {(v.global_af * 100).toFixed(1)}%
+          </div>
+          <!-- Allele frequency bar chart -->
+          <div class="space-y-1.5">
+            {populations.map((pop) => {
+              const af = v[pop] || 0;
+              const pct = (af * 100).toFixed(1);
+              return (
+                <div class="flex items-center gap-2">
+                  <span class="text-xs w-8 text-[var(--text-secondary)]">{popLabels[pop]}</span>
+                  <div class="flex-1 h-2 rounded-full bg-[var(--bg-secondary)] overflow-hidden">
+                    <div class="h-full rounded-full" style={`width: ${Math.max(af * 100, 0.5)}%; background: ${popColors[pop]}`}></div>
+                  </div>
+                  <span class="text-xs w-12 text-right text-[var(--text-secondary)]">{pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  <!-- Full Table -->
+  <div class="card">
+    <h2 class="text-lg font-semibold mb-4">All Variants</h2>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>rsID</th>
+            <th>Gene</th>
+            <th>Disease</th>
+            <th>Chr</th>
+            <th>Position</th>
+            <th>Ref</th>
+            <th>Alt</th>
+            <th>Global AF</th>
+            <th>AFR</th>
+            <th>AMR</th>
+            <th>EUR</th>
+            <th>SAS</th>
+            <th>EAS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {variants.map((v: any) => {
+            const info = diseaseMap[v.rsid] || { disease: "Unknown", gene: "?" };
+            const color = diseaseColors[info.disease] || "#888";
+            return (
+              <tr>
+                <td class="font-mono font-medium">{v.rsid}</td>
+                <td class="font-semibold">{info.gene}</td>
+                <td>
+                  <span class="text-xs px-2 py-0.5 rounded-full" style={`background: ${color}20; color: ${color}`}>
+                    {info.disease}
+                  </span>
+                </td>
+                <td>{v.chrom}</td>
+                <td class="font-mono text-xs">{v.pos.toLocaleString()}</td>
+                <td class="font-mono">{v.ref}</td>
+                <td class="font-mono">{v.alt}</td>
+                <td class="font-semibold">{(v.global_af * 100).toFixed(1)}%</td>
+                {populations.map((pop) => (
+                  <td class="text-[var(--text-secondary)]">{((v[pop] || 0) * 100).toFixed(1)}%</td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Layout>

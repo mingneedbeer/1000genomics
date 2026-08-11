@@ -1,0 +1,11 @@
+google-cloud-bigquery
+google-cloud-storage
+google-cloud-aiplatform
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+pyyaml
+db-dtypes
+joblib
